@@ -142,9 +142,9 @@ void SoftFFmpegVideo::deInitDecoder() {
         }
         if (mCodecAlreadyOpened) {
             avcodec_close(mCtx);
-            av_free(mCtx);
-            mCtx = NULL;
         }
+        av_free(mCtx);
+        mCtx = NULL;
     }
     if (mFrame) {
         av_freep(&mFrame);
@@ -475,6 +475,7 @@ int32_t SoftFFmpegVideo::decodeVideo() {
     av_frame_unref(mFrame);
 
     err = avcodec_decode_video2(mCtx, mFrame, &gotPic, &pkt);
+    av_packet_unref(&pkt);
 
     if (err < 0) {
         ALOGE("ffmpeg video decoder failed to decode frame. (%d)", err);

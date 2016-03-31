@@ -1269,7 +1269,7 @@ void FFmpegExtractor::readerEntry() {
                     memcpy(avctx->extradata, pkt->data, avctx->extradata_size);
                     memset(avctx->extradata + i, 0, FF_INPUT_BUFFER_PADDING_SIZE);
                 } else {
-                    av_free_packet(pkt);
+                    av_packet_unref(pkt);
                     continue;
                 }
 
@@ -1290,7 +1290,7 @@ void FFmpegExtractor::readerEntry() {
                                    pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
 
                 if (ret < 0 ||!outbuf_size) {
-                    av_free_packet(pkt);
+                    av_packet_unref(pkt);
                     continue;
                 }
                 if (outbuf && outbuf != pkt->data) {
@@ -1300,7 +1300,7 @@ void FFmpegExtractor::readerEntry() {
             }
             if (mDefersToCreateAudioTrack) {
                 if (avctx->extradata_size <= 0) {
-                    av_free_packet(pkt);
+                    av_packet_unref(pkt);
                     continue;
                 }
                 stream_component_open(mAudioStreamIdx);
@@ -1317,7 +1317,7 @@ void FFmpegExtractor::readerEntry() {
         } else if (pkt->stream_index == mVideoStreamIdx) {
             packet_queue_put(&mVideoQ, pkt);
         } else {
-            av_free_packet(pkt);
+            av_packet_unref(pkt);
         }
     }
 
@@ -1461,7 +1461,7 @@ retry:
 
     if (seeking) {
         if (pkt.data != mQueue->flush_pkt.data) {
-            av_free_packet(&pkt);
+            av_packet_unref(&pkt);
             goto retry;
         } else {
             seeking = false;
@@ -1473,12 +1473,12 @@ retry:
 
     if (pkt.data == mQueue->flush_pkt.data) {
         ALOGV("read %s flush pkt", av_get_media_type_string(mMediaType));
-        av_free_packet(&pkt);
+        av_packet_unref(&pkt);
         mFirstKeyPktTimestamp = AV_NOPTS_VALUE;
         goto retry;
     } else if (pkt.data == NULL && pkt.size == 0) {
         ALOGD("read %s eos pkt", av_get_media_type_string(mMediaType));
-        av_free_packet(&pkt);
+        av_packet_unref(&pkt);
         mExtractor->reachedEOS(mMediaType);
         return ERROR_END_OF_STREAM;
     }
@@ -1489,7 +1489,7 @@ retry:
     if (waitKeyPkt) {
         if (!key) {
             ALOGV("drop the non-key packet");
-            av_free_packet(&pkt);
+            av_packet_unref(&pkt);
             goto retry;
         } else {
             ALOGV("~~~~~~ got the key packet");
@@ -1518,7 +1518,7 @@ retry:
             ALOGE("convertNal2AnnexB failed");
             mediaBuffer->release();
             mediaBuffer = NULL;
-            av_free_packet(&pkt);
+            av_packet_unref(&pkt);
             return ERROR_MALFORMED;
         }
     } else {
@@ -1541,13 +1541,8 @@ retry:
                , timeUs, startTimeUs, pkt.dts, pkt.pts);
         mediaBuffer->release();
         mediaBuffer = NULL;
-        av_free_packet(&pkt);
-        if (max_negative_time_frame-- > 0) {
-            goto retry;
-        } else {
-            ALOGE("too many negative timestamp packets, abort decoding");
-            return ERROR_MALFORMED;
-        }
+        av_packet_unref(&pkt);
+        return ERROR_MALFORMED;
     }
 
     // predict the next PTS to use for exact-frame seek below
@@ -1590,7 +1585,7 @@ retry:
 
     *buffer = mediaBuffer;
 
-    av_free_packet(&pkt);
+    av_packet_unref(&pkt);
 
     return OK;
 }

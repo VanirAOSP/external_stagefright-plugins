@@ -1526,7 +1526,7 @@ retry:
     }
 
     if (pktTS != AV_NOPTS_VALUE)
-        timeUs = av_rescale_q(pktTS, mStream->time_base, AV_TIME_BASE_Q) + startTimeUs;
+        timeUs = av_rescale_q(pktTS, mStream->time_base, AV_TIME_BASE_Q) - startTimeUs;
     else
         timeUs = SF_NOPTS_VALUE; //FIXME AV_NOPTS_VALUE is negative, but stagefright need positive
 
@@ -1542,7 +1542,12 @@ retry:
         mediaBuffer->release();
         mediaBuffer = NULL;
         av_packet_unref(&pkt);
-        return ERROR_MALFORMED;
+        if (max_negative_time_frame-- > 0) {
+            goto retry;
+        } else {
+            ALOGE("too many negative timestamp packets, abort decoding");
+            return ERROR_MALFORMED;
+        }
     }
 
     // predict the next PTS to use for exact-frame seek below
